@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
+
+var headerEscapeRegex = regexp.MustCompile(`([|\\])`)
 
 // InvalidCefVersionErr error when provided an invalid CEF version. Value should be 0 or 1
 var InvalidCefVersionErr = errors.New("invalid cef version")
@@ -36,22 +39,34 @@ func OmitSyslogHeader() LoggerConfigOption {
 
 // Logger is a logger for cef events
 type Logger struct {
+	// addSyslogHeader add syslog style header as per spec. Configurable to allow outputting to file, where that header is omitted
 	addSyslogHeader bool
-	cefVersion      byte
-	out             io.Writer
-	getTime         func() time.Time // this is cursed for testing. You basically always want time.Now() for this
-	DeviceVendor    string
-	DeviceProduct   string
-	DeviceVersion   string
+	// cefVersion should be 0 or 1
+	cefVersion byte
+	// out writer for output
+	out io.Writer
+
+	// Manually set time & hostname functions here. This is cursed for testing.
+	getTime     func() time.Time       // You basically always want time.Now() for this
+	getHostname func() (string, error) // use os.Hostname()
+
+	// DeviceVendor device vendor in CEF header.
+	DeviceVendor string
+
+	// DeviceProduct product in CEF header. Ordered pair (DeviceVendor, DeviceProduct) should uniquely identify class of event
+	DeviceProduct string
+	// DeviceVersion device version in CEF header.
+	DeviceVersion string
 }
 
-// NewLogger creates a new CEF v1 event logger with default values.
+// NewLogger creates a new CEF v1 event logger with default values. This function should be used to create
 func NewLogger(out io.Writer, deviceVendor, deviceProduct, deviceVersion string, fns ...LoggerConfigOption) *Logger {
 	l := &Logger{
 		addSyslogHeader: true,
 		cefVersion:      1,
 		out:             out,
 		getTime:         time.Now,
+		getHostname:     os.Hostname,
 		DeviceVendor:    deviceVendor,
 		DeviceProduct:   deviceProduct,
 		DeviceVersion:   deviceVersion,
@@ -62,11 +77,12 @@ func NewLogger(out io.Writer, deviceVendor, deviceProduct, deviceVersion string,
 	return l
 }
 
+// Log logs CEF event to configured writer
 func (l *Logger) Log(deviceEventClassId string, name string, severity string, extensions Extensions) error {
 	b := strings.Builder{}
 	if l.addSyslogHeader {
 		b.WriteString(l.getTime().Format(time.Stamp))
-		hostname, err := os.Hostname()
+		hostname, err := l.getHostname()
 		if err != nil {
 			return fmt.Errorf("failed to get hostname: %w", err)
 		}
@@ -81,7 +97,7 @@ func (l *Logger) Log(deviceEventClassId string, name string, severity string, ex
 		escapeHeaderField(name),
 		escapeHeaderField(severity),
 	))
-	//TODO add extension formatting here
+	b.WriteString(extensions.String())
 	_, err := l.out.Write([]byte(b.String()))
 	if err != nil {
 		return fmt.Errorf("failed to write log: %w", err)
@@ -90,7 +106,5 @@ func (l *Logger) Log(deviceEventClassId string, name string, severity string, ex
 }
 
 func escapeHeaderField(field string) string {
-	// TODO implement
-
-	return field
+	return headerEscapeRegex.ReplaceAllString(field, "\\${1}")
 }

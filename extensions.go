@@ -1,5 +1,7 @@
 package cefevent
 
+import "strings"
+
 // Extensions represent the additional fields in
 type Extensions struct {
 	// TODO add extensions
@@ -16,6 +18,20 @@ func (e Extensions) String() string {
 }
 
 func escapeExtensionField(f string) string {
-	// TODO implement
-	return f
+	b := strings.Builder{}
+	for _, r := range []rune(f) {
+		switch r {
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		case '=':
+			b.WriteString(`\=`)
+		case '\\':
+			b.WriteString(`\\`)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
