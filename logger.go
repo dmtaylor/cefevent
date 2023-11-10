@@ -1,3 +1,4 @@
+// Package cefevent provides a 'log' like interface for logging CEF events.
 package cefevent
 
 import (
@@ -18,7 +19,8 @@ var InvalidCefVersionErr = errors.New("invalid cef version")
 // LoggerConfigOption is a configuring function for a Logger
 type LoggerConfigOption func(l *Logger)
 
-// WithCefVersion overwrite default CEF version. Returns InvalidCefVersionErr if an invalid value is set
+// WithCefVersion overwrite default CEF version. Returns InvalidCefVersionErr if an invalid value is set. Current accepted
+// versions are 0 & 1. Most users will not need to overwrite this value.
 func WithCefVersion(ver byte) (LoggerConfigOption, error) {
 	if ver != 0 && ver != 1 {
 		return nil, InvalidCefVersionErr
