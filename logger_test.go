@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func testTime() time.Time {
@@ -18,6 +20,8 @@ func testTime() time.Time {
 func testHostname() (string, error) {
 	return "testhost", nil
 }
+
+var severityRegex = regexp.MustCompile(`CEF:\d\|.*\|.*\|.*\|.*\|.*\|(.*)\|`)
 
 var stubWriterError = errors.New("underlying writer error")
 
@@ -210,25 +214,61 @@ func TestWithCefVersion_error(t *testing.T) {
 	assert.ErrorIs(t, err, InvalidCefVersionErr)
 }
 
-//	func TestOmitSyslogHeader(t *testing.T) {
-//		// TODO implement test
-//	}
-//
-//	func TestWithCefVersion(t *testing.T) {
-//		tests := []struct {
-//			name          string
-//			ver           byte
-//			want          LoggerConfigOption
-//			expectedError error
-//		}{
-//			// TODO: Add test cases.
-//		}
-//		for _, tt := range tests {
-//			t.Run(tt.name, func(t *testing.T) {
-//				// TODO update test case here
-//			})
-//		}
-//	}
+func TestLogger_LogUnknown(t *testing.T) {
+	buf := &bytes.Buffer{}
+	l := NewLogger(buf, "testVendor", "testProduct", "1.0")
+	err := l.LogUnknown("tevt1", "test event 1", Extensions{})
+	if assert.NoError(t, err) {
+		matches := severityRegex.FindStringSubmatch(buf.String())
+		require.NotNil(t, matches, "unmatched severity")
+		assert.Equal(t, UnknownSeverity, matches[1], "expected Unknown severity, got ", matches[1])
+	}
+}
+
+func TestLogger_LogLow(t *testing.T) {
+	buf := &bytes.Buffer{}
+	l := NewLogger(buf, "testVendor", "testProduct", "1.0")
+	err := l.LogLow("tevt1", "test event 1", Extensions{})
+	if assert.NoError(t, err) {
+		matches := severityRegex.FindStringSubmatch(buf.String())
+		require.NotNil(t, matches, "unmatched severity")
+		assert.Equal(t, LowSeverity, matches[1], "expected Low severity, got ", matches[1])
+	}
+}
+
+func TestLogger_LogMedium(t *testing.T) {
+	buf := &bytes.Buffer{}
+	l := NewLogger(buf, "testVendor", "testProduct", "1.0")
+	err := l.LogMedium("tevt1", "test event 1", Extensions{})
+	if assert.NoError(t, err) {
+		matches := severityRegex.FindStringSubmatch(buf.String())
+		require.NotNil(t, matches, "unmatched severity")
+		assert.Equal(t, MediumSeverity, matches[1], "expected Medium severity, got ", matches[1])
+	}
+}
+
+func TestLogger_LogHigh(t *testing.T) {
+	buf := &bytes.Buffer{}
+	l := NewLogger(buf, "testVendor", "testProduct", "1.0")
+	err := l.LogHigh("tevt1", "test event 1", Extensions{})
+	if assert.NoError(t, err) {
+		matches := severityRegex.FindStringSubmatch(buf.String())
+		require.NotNil(t, matches, "unmatched severity")
+		assert.Equal(t, HighSeverity, matches[1], "expected High severity, got ", matches[1])
+	}
+}
+
+func TestLogger_LogVeryHigh(t *testing.T) {
+	buf := &bytes.Buffer{}
+	l := NewLogger(buf, "testVendor", "testProduct", "1.0")
+	err := l.LogVeryHigh("tevt1", "test event 1", Extensions{})
+	if assert.NoError(t, err) {
+		matches := severityRegex.FindStringSubmatch(buf.String())
+		require.NotNil(t, matches, "unmatched severity")
+		assert.Equal(t, VeryHighSeverity, matches[1], "expected Very-High severity, got ", matches[1])
+	}
+}
+
 func Test_escapeHeaderField(t *testing.T) {
 	tests := []struct {
 		name  string

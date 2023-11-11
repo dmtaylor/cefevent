@@ -1,4 +1,4 @@
-// Package cefevent provides a 'log' like interface for logging CEF events.
+// Package cefevent provides a 'log'/'slog' like interface for logging CEF events.
 package cefevent
 
 import (
@@ -11,6 +11,12 @@ import (
 	"time"
 )
 
+var defaultLogger *Logger
+
+func init() {
+	defaultLogger = NewLogger(os.Stdout, "go", "cefevent", "v0.1")
+}
+
 var headerEscapeRegex = regexp.MustCompile(`([|\\])`)
 
 // InvalidCefVersionErr error when provided an invalid CEF version. Value should be 0 or 1
@@ -18,6 +24,14 @@ var InvalidCefVersionErr = errors.New("invalid cef version")
 
 // LoggerConfigOption is a configuring function for a Logger
 type LoggerConfigOption func(l *Logger)
+
+// MustLoggerConfig panics if err is non-nil. Useful for wrapping WithCefVersion at startup time.
+func MustLoggerConfig(l LoggerConfigOption, err error) LoggerConfigOption {
+	if err != nil {
+		panic(err)
+	}
+	return l
+}
 
 // WithCefVersion overwrite default CEF version. Returns InvalidCefVersionErr if an invalid value is set. Current accepted
 // versions are 0 & 1. Most users will not need to overwrite this value.
@@ -80,7 +94,7 @@ func NewLogger(out io.Writer, deviceVendor, deviceProduct, deviceVersion string,
 }
 
 // Log logs CEF event to configured writer
-func (l *Logger) Log(deviceEventClassId string, name string, severity string, extensions Extensions) error {
+func (l *Logger) Log(deviceEventClassId, name, severity string, extensions Extensions) error {
 	b := strings.Builder{}
 	if l.addSyslogHeader {
 		b.WriteString(l.getTime().Format(`Jan 2 15:04:05`))
@@ -105,6 +119,66 @@ func (l *Logger) Log(deviceEventClassId string, name string, severity string, ex
 		return fmt.Errorf("failed to write log: %w", err)
 	}
 	return nil
+}
+
+// Log logs CEF event with default logger
+func Log(deviceEventClassId, name, severity string, extensions Extensions) error {
+	return defaultLogger.Log(deviceEventClassId, name, severity, extensions)
+}
+
+// LogUnknown log CEF event with unknown severity
+func (l *Logger) LogUnknown(deviceEventClassId, name string, extensions Extensions) error {
+	return l.Log(deviceEventClassId, name, UnknownSeverity, extensions)
+}
+
+// LogUnknown log CEF event with unknown severity to default logger
+func LogUnknown(deviceEventClassId, name string, extensions Extensions) error {
+	return defaultLogger.LogUnknown(deviceEventClassId, name, extensions)
+}
+
+// LogLow log CEF event with low severity
+func (l *Logger) LogLow(deviceEventClassId, name string, extensions Extensions) error {
+	return l.Log(deviceEventClassId, name, LowSeverity, extensions)
+}
+
+// LogLow log CEF event with low severity to default logger
+func LogLow(deviceEventClassId, name string, extensions Extensions) error {
+	return defaultLogger.LogLow(deviceEventClassId, name, extensions)
+}
+
+// LogMedium log CEF event with medium severity
+func (l *Logger) LogMedium(deviceEventClassId, name string, extensions Extensions) error {
+	return l.Log(deviceEventClassId, name, MediumSeverity, extensions)
+}
+
+// LogMedium log CEF event with medium severity to default logger
+func LogMedium(deviceEventClassId, name string, extensions Extensions) error {
+	return defaultLogger.LogMedium(deviceEventClassId, name, extensions)
+}
+
+// LogHigh log CEF event with high severity
+func (l *Logger) LogHigh(deviceEventClassId, name string, extensions Extensions) error {
+	return l.Log(deviceEventClassId, name, HighSeverity, extensions)
+}
+
+// LogHigh log CEF event with high severity to default logger
+func LogHigh(deviceEventClassId, name string, extensions Extensions) error {
+	return defaultLogger.LogHigh(deviceEventClassId, name, extensions)
+}
+
+// LogVeryHigh log CEF event with very-high severity
+func (l *Logger) LogVeryHigh(deviceEventClassId, name string, extensions Extensions) error {
+	return l.Log(deviceEventClassId, name, VeryHighSeverity, extensions)
+}
+
+// LogVeryHigh log CEF event with very-high severity to default logger
+func LogVeryHigh(deviceEventClassId, name string, extensions Extensions) error {
+	return defaultLogger.LogVeryHigh(deviceEventClassId, name, extensions)
+}
+
+// SetDefaultLogger sets the default logger to a created one. Useful for using package level functions
+func SetDefaultLogger(log *Logger) {
+	defaultLogger = log
 }
 
 func escapeHeaderField(field string) string {
