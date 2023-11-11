@@ -2,6 +2,8 @@ package cefevent
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -15,6 +17,14 @@ func testTime() time.Time {
 
 func testHostname() (string, error) {
 	return "testhost", nil
+}
+
+var stubWriterError = errors.New("underlying writer error")
+
+type errorWriter struct{}
+
+func (e errorWriter) Write(_ []byte) (int, error) {
+	return 0, stubWriterError
 }
 
 func TestLogger_Log(t *testing.T) {
@@ -35,14 +45,51 @@ func TestLogger_Log(t *testing.T) {
 		name    string
 		fields  fields
 		args    args
-		wantErr bool
+		want    string
+		wantErr assert.ErrorAssertionFunc
 	}{
+		{
+			"simple",
+			fields{
+				addSyslogHeader: true,
+				cefVersion:      1,
+				DeviceVendor:    "cyberdyne",
+				DeviceProduct:   "skynet",
+				DeviceVersion:   "0.9.0",
+			},
+			args{
+				deviceEventClassId: "1000",
+				name:               "testevent",
+				severity:           "Low",
+				extensions:         Extensions{},
+			},
+			"Nov 9 11:45:20 testhost CEF:1|cyberdyne|skynet|0.9.0|1000|testevent|Low|",
+			assert.NoError,
+		},
+		{
+			"omit_syslog_and_cef0",
+			fields{
+				addSyslogHeader: false,
+				cefVersion:      0,
+				DeviceVendor:    "cyberdyne",
+				DeviceProduct:   "skynet",
+				DeviceVersion:   "0.9.1",
+			},
+			args{
+				deviceEventClassId: "1001",
+				name:               "testeventtofile",
+				severity:           LowSeverity,
+				extensions:         Extensions{},
+			},
+			"CEF:0|cyberdyne|skynet|0.9.1|1001|testeventtofile|Low|",
+			assert.NoError,
+		},
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			buf := &bytes.Buffer{}
-			_ = &Logger{
+			l := &Logger{
 				addSyslogHeader: tt.fields.addSyslogHeader,
 				cefVersion:      tt.fields.cefVersion,
 				out:             buf,
@@ -52,12 +99,26 @@ func TestLogger_Log(t *testing.T) {
 				DeviceProduct:   tt.fields.DeviceProduct,
 				DeviceVersion:   tt.fields.DeviceVersion,
 			}
-			// TODO write testify code here
-			//if err := l.Log(tt.args.deviceEventClassId, tt.args.name, tt.args.severity, tt.args.extensions); (err != nil) != tt.wantErr {
-			//	t.Errorf("Log() error = %v, wantErr %v", err, tt.wantErr)
-			//}
+			if tt.wantErr(t, l.Log(tt.args.deviceEventClassId, tt.args.name, tt.args.severity, tt.args.extensions), fmt.Sprintf("Log(%v, %v, %v, %v)", tt.args.deviceEventClassId, tt.args.name, tt.args.severity, tt.args.extensions)) {
+				assert.Equal(t, tt.want, buf.String())
+			}
 		})
 	}
+}
+
+func TestLogger_LogError(t *testing.T) {
+	l := &Logger{
+		addSyslogHeader: false,
+		cefVersion:      1,
+		getTime:         testTime, // pin time and hostname for tests
+		getHostname:     testHostname,
+		DeviceVendor:    "not",
+		DeviceProduct:   "relevant",
+		DeviceVersion:   "1",
+		out:             &errorWriter{},
+	}
+	err := l.Log("9001", "scanner", VeryHighSeverity, Extensions{})
+	assert.EqualError(t, err, "failed to write log: underlying writer error")
 }
 
 func TestNewLogger(t *testing.T) {

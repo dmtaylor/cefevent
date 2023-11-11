@@ -83,7 +83,7 @@ func NewLogger(out io.Writer, deviceVendor, deviceProduct, deviceVersion string,
 func (l *Logger) Log(deviceEventClassId string, name string, severity string, extensions Extensions) error {
 	b := strings.Builder{}
 	if l.addSyslogHeader {
-		b.WriteString(l.getTime().Format(time.Stamp))
+		b.WriteString(l.getTime().Format(`Jan 2 15:04:05`))
 		hostname, err := l.getHostname()
 		if err != nil {
 			return fmt.Errorf("failed to get hostname: %w", err)
