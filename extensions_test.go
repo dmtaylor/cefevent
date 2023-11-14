@@ -1,6 +1,7 @@
 package cefevent
 
 import (
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,6 +64,14 @@ func TestExtensions_String(t *testing.T) {
 				CustomExtensions: map[string]string{"extra": "value", "escaped": "value\nwithnewline"},
 			},
 			"extra=value escaped=value\\nwithnewline",
+		},
+		{
+			"ip_port_value",
+			Extensions{
+				DestinationTranslatedPort:    Ptr(uint(22)),
+				DestinationTranslatedAddress: net.IP{192, 168, 0, 1},
+			},
+			"destinationTranslatedAddress=192.168.0.1 destinationTranslatedPort=22",
 		},
 		// TODO: Add test cases.
 	}

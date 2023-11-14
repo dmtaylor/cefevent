@@ -71,6 +71,7 @@ type Logger struct {
 
 	// DeviceProduct product in CEF header. Ordered pair (DeviceVendor, DeviceProduct) should uniquely identify class of event
 	DeviceProduct string
+
 	// DeviceVersion device version in CEF header.
 	DeviceVersion string
 }

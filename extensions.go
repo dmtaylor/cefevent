@@ -4,6 +4,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Extensions represent the additional fields in a CEF event
@@ -11,26 +12,79 @@ type Extensions struct {
 	// DeviceAction is action taken by device
 	DeviceAction string
 
-	// ApplicationProtocol Application level protocol, example values are HTTP, HTTPS, SSHv2, Telnet, POP, and so on.
+	// ApplicationProtocol application level protocol, example values are HTTP, HTTPS, SSHv2, Telnet, POP, and so on.
 	ApplicationProtocol string
 
-	// DestinationDnsDomain The DNS domain part of the complete fully qualified domain name (FQDN).
+	// DestinationDnsDomain the DNS domain part of the complete fully qualified domain name (FQDN).
 	DestinationDnsDomain string
 
-	// DestinationServiceName The service targeted by this event. Example "sshd"
+	// DestinationServiceName the service targeted by this event. Example "sshd"
 	DestinationServiceName string
 
-	// DestinationTranslatedAddress Identifies the translated destination that the event refers to in an IP network
+	// DestinationTranslatedAddress identifies the translated destination that the event refers to in an IP network
 	DestinationTranslatedAddress net.IP
 
-	// DestinationTranslatedPort Port after it was translated; for example, a firewall. Valid port numbers are 0 to 65535
+	// DestinationTranslatedPort port after it was translated; for example, a firewall. Valid port numbers are 0 to 65535
 	DestinationTranslatedPort *uint
 
-	// DeviceDirection Any information about what direction the observed communication has taken. 0 for inbound, 1 for outbound
+	// DeviceDirection any information about what direction the observed communication has taken. 0 for inbound, 1 for outbound
 	DeviceDirection *uint8
 
-	// DeviceDnsDomain The DNS domain part of the complete fully qualified domain name (FQDN)
+	// DeviceDnsDomain the DNS domain part of the complete fully qualified domain name (FQDN)
 	DeviceDnsDomain string
+
+	// DeviceExternalId a name that uniquely identifies the device generating this event.
+	DeviceExternalId string
+
+	// DeviceFacility the facility generating this event
+	DeviceFacility string
+
+	// DeviceInboundInterface interface on which the packet or data entered the device
+	DeviceInboundInterface string
+
+	// DeviceNtDomain the Windows domain name of the device address.
+	DeviceNtDomain string
+
+	// DeviceOutboundInterface interface on which the packet or data left the device
+	DeviceOutboundInterface string
+
+	// DevicePayloadId unique identifier for the payload associated with the event
+	DevicePayloadId string
+
+	// DeviceProcessName process name associated with event e.g. process creating syslog entry
+	DeviceProcessName string
+
+	// DeviceTranslatedAddress identifies the translated device address that the event refers to in an IP network.
+	DeviceTranslatedAddress net.IP
+
+	// DeviceTimeZone timezone for device generating event
+	DeviceTimeZone *time.Location
+
+	// DestinationHostName identifies the destination that an event refers to in a network. The format should be a
+	// fully qualified domain name associated with the destination node when available. e.g. "sub.example.com" or "example"
+	DestinationHostName string
+
+	// DestinationMacAddress MAC address for destination referred to in event
+	DestinationMacAddress net.HardwareAddr
+
+	// DestinationNtDomain Windows domain name of destination address
+	DestinationNtDomain string
+
+	// DestinationProcessId process ID for destination process associated with event.
+	DestinationProcessId *uint
+
+	// DestinationUserPrivileges identify destination user's privileges e.g. "Administrator", "User", "Guest"
+	DestinationUserPrivileges string
+
+	// DestinationProcessName name of event's destination process e.g. "ftpd"
+	DestinationProcessName string
+
+	// DestinationPort valid port number for destination process. Between 0 & 65535
+	DestinationPort *uint
+
+	// DestinationAddress identifies the destination IP address the event refers to.
+	DestinationAddress net.IP
+
 	// TODO add all extensions
 
 	// CustomExtensions includes non-standard mappings in the extension field. Keys in the map shouldn't overlap with fields in the
@@ -47,23 +101,13 @@ func (e Extensions) String() string {
 	if e.ApplicationProtocol != "" {
 		b.WriteString("app=" + escapeExtensionField(e.ApplicationProtocol) + " ")
 	}
-	if e.DestinationDnsDomain != "" {
-		b.WriteString("destinationDnsDomain=" + escapeExtensionField(e.DestinationDnsDomain) + " ")
+	fcount, destinationStr := e.marshalDestinationFields()
+	if fcount > 0 {
+		b.WriteString(destinationStr)
 	}
-	if e.DestinationServiceName != "" {
-		b.WriteString("destinationServiceName=" + escapeExtensionField(e.DestinationServiceName) + " ")
-	}
-	if str := e.DestinationTranslatedAddress.String(); str != "<nil>" {
-		b.WriteString("destinationTranslatedAddress=" + escapeExtensionField(str) + " ")
-	}
-	if e.DestinationTranslatedPort != nil {
-		b.WriteString("destinationTranslatedPort=" + strconv.FormatUint(uint64(*e.DestinationTranslatedPort), 10) + " ")
-	}
-	if e.DeviceDirection != nil {
-		b.WriteString("deviceDirection=" + strconv.FormatUint(uint64(*e.DeviceDirection), 10) + " ")
-	}
-	if e.DeviceDnsDomain != "" {
-		b.WriteString("deviceDnsDomain=" + e.DeviceDnsDomain + " ")
+	fcount, deviceString := e.marshalDeviceFields()
+	if fcount > 0 {
+		b.WriteString(deviceString)
 	}
 	// TODO implement
 
@@ -71,6 +115,112 @@ func (e Extensions) String() string {
 		b.WriteString(escapeExtensionField(k) + "=" + escapeExtensionField(v) + " ")
 	}
 	return strings.TrimSpace(b.String())
+}
+
+func (e Extensions) marshalDeviceFields() (int, string) {
+	c := 0
+	b := strings.Builder{}
+
+	if e.DeviceDirection != nil {
+		c += 1
+		b.WriteString("deviceDirection=" + strconv.FormatUint(uint64(*e.DeviceDirection), 10) + " ")
+	}
+	if e.DeviceDnsDomain != "" {
+		c += 1
+		b.WriteString("deviceDnsDomain=" + escapeExtensionField(e.DeviceDnsDomain) + " ")
+	}
+	if e.DeviceExternalId != "" {
+		c += 1
+		b.WriteString("deviceExternalId=" + escapeExtensionField(e.DeviceExternalId) + " ")
+	}
+	if e.DeviceFacility != "" {
+		c += 1
+		b.WriteString("deviceFacility=" + escapeExtensionField(e.DeviceFacility) + " ")
+	}
+	if e.DeviceInboundInterface != "" {
+		c += 1
+		b.WriteString("deviceInboundInterface=" + escapeExtensionField(e.DeviceInboundInterface) + " ")
+	}
+	if e.DeviceNtDomain != "" {
+		c += 1
+		b.WriteString("deviceNtInterface=" + escapeExtensionField(e.DeviceNtDomain) + " ")
+	}
+	if e.DeviceOutboundInterface != "" {
+		c += 1
+		b.WriteString("deviceOutboundInterface=" + escapeExtensionField(e.DeviceOutboundInterface) + " ")
+	}
+	if e.DevicePayloadId != "" {
+		c += 1
+		b.WriteString("devicePayloadId=" + escapeExtensionField(e.DevicePayloadId) + " ")
+	}
+	if e.DeviceProcessName != "" {
+		c += 1
+		b.WriteString("deviceProcessName=" + escapeExtensionField(e.DeviceProcessName) + " ")
+	}
+	if e.DeviceTimeZone != nil {
+		c += 1
+		b.WriteString("dtz=" + escapeHeaderField(e.DeviceTimeZone.String()) + " ")
+	}
+	// TODO add custom mapped fields
+	return c, b.String()
+}
+
+func (e Extensions) marshalDestinationFields() (int, string) {
+	b := strings.Builder{}
+	c := 0
+	if e.DestinationDnsDomain != "" {
+		c += 1
+		b.WriteString("destinationDnsDomain=" + escapeExtensionField(e.DestinationDnsDomain) + " ")
+	}
+	if e.DestinationServiceName != "" {
+		c += 1
+		b.WriteString("destinationServiceName=" + escapeExtensionField(e.DestinationServiceName) + " ")
+	}
+	if str := e.DestinationTranslatedAddress.String(); str != "<nil>" {
+		c += 1
+		b.WriteString("destinationTranslatedAddress=" + escapeExtensionField(str) + " ")
+	}
+	if e.DestinationTranslatedPort != nil {
+		c += 1
+		b.WriteString("destinationTranslatedPort=" + strconv.FormatUint(uint64(*e.DestinationTranslatedPort), 10) + " ")
+	}
+	if e.DestinationHostName != "" {
+		c += 1
+		b.WriteString("dhost=" + escapeExtensionField(e.DestinationHostName) + " ")
+	}
+	if len(e.DestinationMacAddress) != 0 {
+		c += 1
+		b.WriteString("dmac=" + e.DestinationMacAddress.String() + " ")
+	}
+	if e.DestinationNtDomain != "" {
+		c += 1
+		b.WriteString("dntdom=" + escapeExtensionField(e.DestinationNtDomain) + " ")
+	}
+	if e.DestinationProcessId != nil {
+		c += 1
+		b.WriteString("dpid=" + strconv.FormatUint(uint64(*e.DestinationProcessId), 10) + " ")
+	}
+	if e.DestinationUserPrivileges != "" {
+		c += 1
+		b.WriteString("dpriv=" + escapeExtensionField(e.DestinationUserPrivileges) + " ")
+	}
+	if e.DestinationProcessName != "" {
+		c += 1
+		b.WriteString("dproc=" + escapeExtensionField(e.DestinationProcessName) + " ")
+	}
+	if e.DestinationPort != nil {
+		c += 1
+		b.WriteString("dpt=" + strconv.FormatUint(uint64(*e.DestinationPort), 10) + " ")
+	}
+	if str := e.DestinationAddress.String(); str != "<nil>" {
+		c += 1
+		b.WriteString("dst=" + str + " ")
+	}
+	// TODO add destination marshaling
+
+	// TODO add custom mapped fields
+
+	return c, b.String()
 }
 
 func escapeExtensionField(f string) string {
@@ -90,4 +240,9 @@ func escapeExtensionField(f string) string {
 		}
 	}
 	return b.String()
+}
+
+// Ptr is a convenience function to convert literal values to pointers
+func Ptr[A any](v A) *A {
+	return &v
 }
