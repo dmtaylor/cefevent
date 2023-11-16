@@ -61,9 +61,10 @@ func TestExtensions_String(t *testing.T) {
 		{
 			"extras",
 			Extensions{
-				CustomExtensions: map[string]string{"extra": "value", "escaped": "value\nwithnewline"},
+				Message:          "value\nwithnewline",
+				CustomExtensions: map[string]string{"extra": "value"},
 			},
-			"extra=value escaped=value\\nwithnewline",
+			"msg=value\\nwithnewline extra=value",
 		},
 		{
 			"ip_port_value",

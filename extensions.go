@@ -9,7 +9,11 @@ import (
 
 // Extensions represent the additional fields in a CEF event
 type Extensions struct {
-	// DeviceAction is action taken by device
+
+	// Message is an arbitrary message giving more details about the event
+	Message string
+
+	// DeviceAction is the action taken by device
 	DeviceAction string
 
 	// ApplicationProtocol application level protocol, example values are HTTP, HTTPS, SSHv2, Telnet, POP, and so on.
@@ -60,6 +64,18 @@ type Extensions struct {
 	// DeviceTimeZone timezone for device generating event
 	DeviceTimeZone *time.Location
 
+	// DeviceAddress identifies the device address that an event refers to
+	DeviceAddress net.IP
+
+	// DeviceHostName FQDN associated with device node e.g. "evt.example.com"
+	DeviceHostName string
+
+	// DeviceMacAddress MAC address for device in event
+	DeviceMacAddress net.HardwareAddr
+
+	// DeviceProcessId is the PID of the process on the device generating the event
+	DeviceProcessId *uint
+
 	// DestinationHostName identifies the destination that an event refers to in a network. The format should be a
 	// fully qualified domain name associated with the destination node when available. e.g. "sub.example.com" or "example"
 	DestinationHostName string
@@ -85,6 +101,9 @@ type Extensions struct {
 	// DestinationAddress identifies the destination IP address the event refers to.
 	DestinationAddress net.IP
 
+	// DestinationUserId identifies the destination user by ID e.g. root is typically "0"
+	DestinationUserId string
+
 	// TODO add all extensions
 
 	// CustomExtensions includes non-standard mappings in the extension field. Keys in the map shouldn't overlap with fields in the
@@ -95,6 +114,9 @@ type Extensions struct {
 // String formats extension for including in CEF event
 func (e Extensions) String() string {
 	b := strings.Builder{}
+	if e.Message != "" {
+		b.WriteString("msg=" + escapeExtensionField(e.Message) + " ")
+	}
 	if e.DeviceAction != "" {
 		b.WriteString("act=" + escapeExtensionField(e.DeviceAction) + " ")
 	}
@@ -159,7 +181,23 @@ func (e Extensions) marshalDeviceFields() (int, string) {
 	}
 	if e.DeviceTimeZone != nil {
 		c += 1
-		b.WriteString("dtz=" + escapeHeaderField(e.DeviceTimeZone.String()) + " ")
+		b.WriteString("dtz=" + escapeExtensionField(e.DeviceTimeZone.String()) + " ")
+	}
+	if str := e.DeviceAddress.String(); str != "<nil>" {
+		c += 1
+		b.WriteString("dvc=" + str + " ")
+	}
+	if e.DeviceHostName != "" {
+		c += 1
+		b.WriteString("dcvhost=" + escapeExtensionField(e.DeviceHostName) + " ")
+	}
+	if len(e.DeviceMacAddress) != 0 {
+		c += 1
+		b.WriteString("dvcmac=" + e.DeviceMacAddress.String() + " ")
+	}
+	if e.DeviceProcessId != nil {
+		c += 1
+		b.WriteString("dvcpid=" + strconv.FormatUint(uint64(*e.DeviceProcessId), 10) + " ")
 	}
 	// TODO add custom mapped fields
 	return c, b.String()
@@ -215,6 +253,10 @@ func (e Extensions) marshalDestinationFields() (int, string) {
 	if str := e.DestinationAddress.String(); str != "<nil>" {
 		c += 1
 		b.WriteString("dst=" + str + " ")
+	}
+	if e.DestinationUserId != "" {
+		c += 1
+		b.WriteString("duid=" + escapeExtensionField(e.DestinationUserId) + " ")
 	}
 	// TODO add destination marshaling
 
