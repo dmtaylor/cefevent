@@ -9,15 +9,24 @@ import (
 
 // Extensions represent the additional fields in a CEF event
 type Extensions struct {
+	//// General Event Fields
 
 	// Message is an arbitrary message giving more details about the event
 	Message string
 
-	// DeviceAction is the action taken by device
-	DeviceAction string
+	// BaseEventCount is the number of times this same event was observed. Omitted if count is less than 2.
+	BaseEventCount int
 
 	// ApplicationProtocol application level protocol, example values are HTTP, HTTPS, SSHv2, Telnet, POP, and so on.
 	ApplicationProtocol string
+
+	// EndTime is the time at which activity associated with the event ended
+	EndTime time.Time
+
+	// ExternalId is an ID used by the originating device. Typically this is a monotonically increasing value, e.g. a Session ID
+	ExternalId string
+
+	//// Destination Fields
 
 	// DestinationDnsDomain the DNS domain part of the complete fully qualified domain name (FQDN).
 	DestinationDnsDomain string
@@ -30,6 +39,39 @@ type Extensions struct {
 
 	// DestinationTranslatedPort port after it was translated; for example, a firewall. Valid port numbers are 0 to 65535
 	DestinationTranslatedPort *uint
+
+	// DestinationHostName identifies the destination that an event refers to in a network. The format should be a
+	// fully qualified domain name associated with the destination node when available. e.g. "sub.example.com" or "example"
+	DestinationHostName string
+
+	// DestinationMacAddress MAC address for destination referred to in event
+	DestinationMacAddress net.HardwareAddr
+
+	// DestinationNtDomain Windows domain name of destination address
+	DestinationNtDomain string
+
+	// DestinationProcessId process ID for destination process associated with event.
+	DestinationProcessId *uint
+
+	// DestinationUserPrivileges identify destination user's privileges e.g. "Administrator", "User", "Guest"
+	DestinationUserPrivileges string
+
+	// DestinationProcessName name of event's destination process e.g. "ftpd"
+	DestinationProcessName string
+
+	// DestinationPort valid port number for destination process. Between 0 & 65535
+	DestinationPort *uint
+
+	// DestinationAddress identifies the destination IP address the event refers to.
+	DestinationAddress net.IP
+
+	// DestinationUserId identifies the destination user by ID e.g. root is typically "0"
+	DestinationUserId string
+
+	//// Device Fields
+
+	// DeviceAction is the action taken by device
+	DeviceAction string
 
 	// DeviceDirection any information about what direction the observed communication has taken. 0 for inbound, 1 for outbound
 	DeviceDirection *uint8
@@ -76,33 +118,10 @@ type Extensions struct {
 	// DeviceProcessId is the PID of the process on the device generating the event
 	DeviceProcessId *uint
 
-	// DestinationHostName identifies the destination that an event refers to in a network. The format should be a
-	// fully qualified domain name associated with the destination node when available. e.g. "sub.example.com" or "example"
-	DestinationHostName string
+	//// File fields
 
-	// DestinationMacAddress MAC address for destination referred to in event
-	DestinationMacAddress net.HardwareAddr
-
-	// DestinationNtDomain Windows domain name of destination address
-	DestinationNtDomain string
-
-	// DestinationProcessId process ID for destination process associated with event.
-	DestinationProcessId *uint
-
-	// DestinationUserPrivileges identify destination user's privileges e.g. "Administrator", "User", "Guest"
-	DestinationUserPrivileges string
-
-	// DestinationProcessName name of event's destination process e.g. "ftpd"
-	DestinationProcessName string
-
-	// DestinationPort valid port number for destination process. Between 0 & 65535
-	DestinationPort *uint
-
-	// DestinationAddress identifies the destination IP address the event refers to.
-	DestinationAddress net.IP
-
-	// DestinationUserId identifies the destination user by ID e.g. root is typically "0"
-	DestinationUserId string
+	// FileCreateTime is the time when the file was created
+	FileCreateTime time.Time
 
 	// TODO add all extensions
 
@@ -122,6 +141,15 @@ func (e Extensions) String() string {
 	}
 	if e.ApplicationProtocol != "" {
 		b.WriteString("app=" + escapeExtensionField(e.ApplicationProtocol) + " ")
+	}
+	if e.BaseEventCount > 1 {
+		b.WriteString("cnt=" + strconv.FormatInt(int64(e.BaseEventCount), 10) + " ")
+	}
+	if !e.EndTime.IsZero() {
+		b.WriteString("end=" + strconv.FormatInt(e.EndTime.UnixMilli(), 10) + " ") // Use unix time here
+	}
+	if e.ExternalId != "" {
+		b.WriteString("externalId=" + escapeExtensionField(e.ExternalId) + " ")
 	}
 	fcount, destinationStr := e.marshalDestinationFields()
 	if fcount > 0 {
@@ -261,6 +289,20 @@ func (e Extensions) marshalDestinationFields() (int, string) {
 	// TODO add destination marshaling
 
 	// TODO add custom mapped fields
+
+	return c, b.String()
+}
+
+func (e Extensions) marshalFileFields() (int, string) {
+	c := 0
+	b := strings.Builder{}
+
+	if !e.FileCreateTime.IsZero() {
+		c += 1
+		b.WriteString("fileCreateTime=" + strconv.FormatInt(e.FileCreateTime.UnixMilli(), 10) + " ")
+	}
+
+	//TODO add file fields
 
 	return c, b.String()
 }
