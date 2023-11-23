@@ -74,6 +74,18 @@ func TestExtensions_String(t *testing.T) {
 			},
 			"destinationTranslatedAddress=192.168.0.1 destinationTranslatedPort=22",
 		},
+		{
+			"file_data_1",
+			Extensions{
+				FileSize:             Ptr(uint(2048)),
+				FileType:             "normal",
+				FileModificationTime: testTime(),
+				FileCreateTime:       testTime(),
+				FileId:               "6452",
+				FileName:             "example.txt",
+			},
+			"fileCreateTime=1699530320000 fileId=6452 fileModificationTime=1699530320000 fileType=normal fname=example.txt fsize=2048",
+		},
 		// TODO: Add test cases.
 	}
 	for _, tt := range tests {

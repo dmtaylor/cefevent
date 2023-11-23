@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+// Event type constants for use in the Type field
+const (
+	BaseEventType        = 0 // Used for base type. Note: will be omitted as per spec
+	AggregatedEventType  = 1 // Used for aggregated events
+	CorrelationEventType = 2 // Used for correlated events
+	ActionEventType      = 3 // Used for action events
+)
+
 // Extensions represent the additional fields in a CEF event
 type Extensions struct {
 	//// General Event Fields
@@ -23,8 +31,14 @@ type Extensions struct {
 	// EndTime is the time at which activity associated with the event ended
 	EndTime time.Time
 
-	// ExternalId is an ID used by the originating device. Typically this is a monotonically increasing value, e.g. a Session ID
+	// ExternalId is an ID used by the originating device.
+	// Typically this is a monotonically increasing value, e.g. a Session ID
 	ExternalId string
+
+	// Type is the type of event.
+	// 0 for base, 1 for aggregated, 2 for correlation, and 3 for action.
+	// Base event types will be omitted.
+	Type byte
 
 	//// Destination Fields
 
@@ -97,7 +111,7 @@ type Extensions struct {
 	// DevicePayloadId unique identifier for the payload associated with the event
 	DevicePayloadId string
 
-	// DeviceProcessName process name associated with event e.g. process creating syslog entry
+	// DeviceProcessName process name associated with event e.g. process creating syslog entry.
 	DeviceProcessName string
 
 	// DeviceTranslatedAddress identifies the translated device address that the event refers to in an IP network.
@@ -122,6 +136,30 @@ type Extensions struct {
 
 	// FileCreateTime is the time when the file was created
 	FileCreateTime time.Time
+
+	// FileHash is a hash of a referenced file
+	FileHash string
+
+	// FileId is an ID associated with the file (e.g. inode)
+	FileId string
+
+	// FileModificationTime is the time when the file was last modified
+	FileModificationTime time.Time
+
+	// FilePath is the absolute path of the file, including the filename.
+	FilePath string
+
+	// FilePermission is the permission string for the file
+	FilePermission string
+
+	// FileType is the type of file (normal, pipe, socket, etc)
+	FileType string
+
+	// FileName is the name of file only (without path)
+	FileName string
+
+	// FileSize is the size of the referenced file in bytes
+	FileSize *uint
 
 	// TODO add all extensions
 
@@ -151,6 +189,9 @@ func (e Extensions) String() string {
 	if e.ExternalId != "" {
 		b.WriteString("externalId=" + escapeExtensionField(e.ExternalId) + " ")
 	}
+	if e.Type != 0 {
+		b.WriteString("type=" + strconv.FormatInt(int64(e.Type), 10) + " ")
+	}
 	fcount, destinationStr := e.marshalDestinationFields()
 	if fcount > 0 {
 		b.WriteString(destinationStr)
@@ -158,6 +199,10 @@ func (e Extensions) String() string {
 	fcount, deviceString := e.marshalDeviceFields()
 	if fcount > 0 {
 		b.WriteString(deviceString)
+	}
+	fcount, fileString := e.marshalFileFields()
+	if fcount > 0 {
+		b.WriteString(fileString)
 	}
 	// TODO implement
 
@@ -300,6 +345,38 @@ func (e Extensions) marshalFileFields() (int, string) {
 	if !e.FileCreateTime.IsZero() {
 		c += 1
 		b.WriteString("fileCreateTime=" + strconv.FormatInt(e.FileCreateTime.UnixMilli(), 10) + " ")
+	}
+	if e.FileHash != "" {
+		c += 1
+		b.WriteString("fileHash=" + escapeExtensionField(e.FileHash) + " ")
+	}
+	if e.FileId != "" {
+		c += 1
+		b.WriteString("fileId=" + escapeExtensionField(e.FileId) + " ")
+	}
+	if !e.FileModificationTime.IsZero() {
+		c += 1
+		b.WriteString("fileModificationTime=" + strconv.FormatInt(e.FileModificationTime.UnixMilli(), 10) + " ")
+	}
+	if e.FilePath != "" {
+		c += 1
+		b.WriteString("filePath=" + escapeExtensionField(e.FilePath) + " ")
+	}
+	if e.FilePermission != "" {
+		c += 1
+		b.WriteString("filePermission=" + escapeExtensionField(e.FilePermission) + " ")
+	}
+	if e.FileType != "" {
+		c += 1
+		b.WriteString("fileType=" + escapeExtensionField(e.FileType) + " ")
+	}
+	if e.FileName != "" {
+		c += 1
+		b.WriteString("fname=" + escapeExtensionField(e.FileName) + " ")
+	}
+	if e.FileSize != nil {
+		c += 1
+		b.WriteString("fsize=" + strconv.FormatUint(uint64(*e.FileSize), 10) + " ")
 	}
 
 	//TODO add file fields
