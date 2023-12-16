@@ -69,7 +69,7 @@ func TestExtensions_String(t *testing.T) {
 		{
 			"ip_port_value",
 			Extensions{
-				DestinationTranslatedPort:    Ptr(uint(22)),
+				DestinationTranslatedPort:    ptr(uint(22)),
 				DestinationTranslatedAddress: net.IP{192, 168, 0, 1},
 			},
 			"destinationTranslatedAddress=192.168.0.1 destinationTranslatedPort=22",
@@ -77,7 +77,7 @@ func TestExtensions_String(t *testing.T) {
 		{
 			"file_data_1",
 			Extensions{
-				FileSize:             Ptr(uint(2048)),
+				FileSize:             ptr(uint(2048)),
 				FileType:             "normal",
 				FileModificationTime: testTime(),
 				FileCreateTime:       testTime(),
@@ -93,4 +93,9 @@ func TestExtensions_String(t *testing.T) {
 			assert.Equalf(t, tt.want, tt.e.String(), "String()")
 		})
 	}
+}
+
+// ptr is a convenience function to convert literal values to pointers
+func ptr[A any](v A) *A {
+	return &v
 }

@@ -2,6 +2,7 @@ package cefevent
 
 import (
 	"net"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -39,6 +40,47 @@ type Extensions struct {
 	// 0 for base, 1 for aggregated, 2 for correlation, and 3 for action.
 	// Base event types will be omitted.
 	Type byte
+
+	// BytesIn is the number of incoming bytes transferred from source to destination
+	BytesIn *uint
+
+	// BytesOut number of outbound bytes transferred from destination to source.
+	BytesOut *uint
+
+	// Outcome is the outcome for the event e.g. "failure"
+	Outcome string
+
+	// TransportProtocol identifies the layer 4 protocol used e.g. TCP
+	TransportProtocol string
+
+	// Reason is the audit event was generated e.g. "bad password"
+	Reason string
+
+	//// Source Fields
+
+	// SourceHostName is the FQDN of the source machine
+	SourceHostName string
+
+	// SourceMacAddress is the MAC address of the source machine.
+	SourceMacAddress net.HardwareAddr
+
+	// SourceNtDomain is the Windows domain name for the source machine.
+	SourceNtDomain string
+
+	// SourceDnsDomain is the DNS domain name portion of the FQDN of the source machine.
+	SourceDnsDomain string
+
+	// SourceServiceName is the name of the service generating the event.
+	SourceServiceName string
+
+	// SourceTranslatedAddress is the translated IP address of the source machine.
+	SourceTranslatedAddress net.IP
+
+	// SourceTranslatedPort is the translated port number of the source machine (e.g. by NAT-ing).
+	SourceTranslatedPort *uint
+
+	// SourceProcessId is the PID of the originating process for the event.
+	SourceProcessId *int
 
 	//// Destination Fields
 
@@ -132,6 +174,9 @@ type Extensions struct {
 	// DeviceProcessId is the PID of the process on the device generating the event
 	DeviceProcessId *uint
 
+	// DeviceReceiptTime is the time at which the event was received
+	DeviceReceiptTime time.Time
+
 	//// File fields
 
 	// FileCreateTime is the time when the file was created
@@ -161,6 +206,49 @@ type Extensions struct {
 	// FileSize is the size of the referenced file in bytes
 	FileSize *uint
 
+	// OldFileCreateTime is the time when the old file was created
+	OldFileCreateTime time.Time
+
+	// OldFileHash is the file hash for the old file
+	OldFileHash string
+
+	// OldFileId is the ID for the old file e.g. inode number
+	OldFileId string
+
+	// OldFileModificationTime is the time when the old file was last modified
+	OldFileModificationTime time.Time
+
+	// OldFileName is the filename for the old file referenced in the event
+	OldFileName string
+
+	// OldFilePath is the absolute path to the old file, including file name.
+	OldFilePath string
+
+	// OldFilePermission is the permission string for the for the old file
+	OldFilePermission string
+
+	// OldFileSize is the size in bytes of the old file.
+	OldFileSize *uint
+
+	// OldFileType is the type of the old file (pipe, socket, etc.)
+	OldFileType string
+
+	//// HTTP fields
+
+	// RequestUrl is the full URL for an HTTP request, including protocol.
+	RequestUrl url.URL
+
+	// RequestClientApplication is the user-agent associated with the request.
+	RequestClientApplication string
+
+	// RequestContext is the context for the request origination (e.g. HTTP Referrer)
+	RequestContext string
+
+	// RequestCookies is the cookie strings associated with the request
+	RequestCookies string
+
+	// RequestMethod is the HTTP verb for the request (e.g. "GET")
+	RequestMethod string
 	// TODO add all extensions
 
 	// CustomExtensions includes non-standard mappings in the extension field. Keys in the map shouldn't overlap with fields in the
@@ -192,16 +280,31 @@ func (e Extensions) String() string {
 	if e.Type != 0 {
 		b.WriteString("type=" + strconv.FormatInt(int64(e.Type), 10) + " ")
 	}
-	fcount, destinationStr := e.marshalDestinationFields()
-	if fcount > 0 {
+	if e.BytesIn != nil {
+		b.WriteString("in=" + strconv.FormatUint(uint64(*e.BytesIn), 10) + " ")
+	}
+	if e.BytesOut != nil {
+		b.WriteString("out=" + strconv.FormatUint(uint64(*e.BytesOut), 10) + " ")
+	}
+	if e.Outcome != "" {
+		b.WriteString("outcome=" + escapeExtensionField(e.Outcome) + " ")
+	}
+	if e.TransportProtocol != "" {
+		b.WriteString("proto=" + escapeExtensionField(e.TransportProtocol) + " ")
+	}
+	if e.Reason != "" {
+		b.WriteString("reason=" + escapeExtensionField(e.Reason) + " ")
+	}
+	destinationStr := e.marshalDestinationFields()
+	if len(destinationStr) > 0 {
 		b.WriteString(destinationStr)
 	}
-	fcount, deviceString := e.marshalDeviceFields()
-	if fcount > 0 {
+	deviceString := e.marshalDeviceFields()
+	if len(deviceString) > 0 {
 		b.WriteString(deviceString)
 	}
-	fcount, fileString := e.marshalFileFields()
-	if fcount > 0 {
+	fileString := e.marshalFileFields()
+	if len(fileString) > 0 {
 		b.WriteString(fileString)
 	}
 	// TODO implement
@@ -212,176 +315,193 @@ func (e Extensions) String() string {
 	return strings.TrimSpace(b.String())
 }
 
-func (e Extensions) marshalDeviceFields() (int, string) {
-	c := 0
+func (e Extensions) marshalDeviceFields() string {
 	b := strings.Builder{}
 
 	if e.DeviceDirection != nil {
-		c += 1
 		b.WriteString("deviceDirection=" + strconv.FormatUint(uint64(*e.DeviceDirection), 10) + " ")
 	}
 	if e.DeviceDnsDomain != "" {
-		c += 1
 		b.WriteString("deviceDnsDomain=" + escapeExtensionField(e.DeviceDnsDomain) + " ")
 	}
 	if e.DeviceExternalId != "" {
-		c += 1
 		b.WriteString("deviceExternalId=" + escapeExtensionField(e.DeviceExternalId) + " ")
 	}
 	if e.DeviceFacility != "" {
-		c += 1
 		b.WriteString("deviceFacility=" + escapeExtensionField(e.DeviceFacility) + " ")
 	}
 	if e.DeviceInboundInterface != "" {
-		c += 1
 		b.WriteString("deviceInboundInterface=" + escapeExtensionField(e.DeviceInboundInterface) + " ")
 	}
 	if e.DeviceNtDomain != "" {
-		c += 1
 		b.WriteString("deviceNtInterface=" + escapeExtensionField(e.DeviceNtDomain) + " ")
 	}
 	if e.DeviceOutboundInterface != "" {
-		c += 1
 		b.WriteString("deviceOutboundInterface=" + escapeExtensionField(e.DeviceOutboundInterface) + " ")
 	}
 	if e.DevicePayloadId != "" {
-		c += 1
 		b.WriteString("devicePayloadId=" + escapeExtensionField(e.DevicePayloadId) + " ")
 	}
 	if e.DeviceProcessName != "" {
-		c += 1
 		b.WriteString("deviceProcessName=" + escapeExtensionField(e.DeviceProcessName) + " ")
 	}
 	if e.DeviceTimeZone != nil {
-		c += 1
 		b.WriteString("dtz=" + escapeExtensionField(e.DeviceTimeZone.String()) + " ")
 	}
 	if str := e.DeviceAddress.String(); str != "<nil>" {
-		c += 1
 		b.WriteString("dvc=" + str + " ")
 	}
 	if e.DeviceHostName != "" {
-		c += 1
 		b.WriteString("dcvhost=" + escapeExtensionField(e.DeviceHostName) + " ")
 	}
 	if len(e.DeviceMacAddress) != 0 {
-		c += 1
 		b.WriteString("dvcmac=" + e.DeviceMacAddress.String() + " ")
 	}
 	if e.DeviceProcessId != nil {
-		c += 1
 		b.WriteString("dvcpid=" + strconv.FormatUint(uint64(*e.DeviceProcessId), 10) + " ")
 	}
+	if !e.DeviceReceiptTime.IsZero() {
+		b.WriteString("rt=" + strconv.FormatInt(e.DeviceReceiptTime.UnixMilli(), 10) + " ")
+	}
 	// TODO add custom mapped fields
-	return c, b.String()
+	return b.String()
 }
 
-func (e Extensions) marshalDestinationFields() (int, string) {
+func (e Extensions) marshalDestinationFields() string {
 	b := strings.Builder{}
-	c := 0
 	if e.DestinationDnsDomain != "" {
-		c += 1
 		b.WriteString("destinationDnsDomain=" + escapeExtensionField(e.DestinationDnsDomain) + " ")
 	}
 	if e.DestinationServiceName != "" {
-		c += 1
 		b.WriteString("destinationServiceName=" + escapeExtensionField(e.DestinationServiceName) + " ")
 	}
 	if str := e.DestinationTranslatedAddress.String(); str != "<nil>" {
-		c += 1
 		b.WriteString("destinationTranslatedAddress=" + escapeExtensionField(str) + " ")
 	}
 	if e.DestinationTranslatedPort != nil {
-		c += 1
 		b.WriteString("destinationTranslatedPort=" + strconv.FormatUint(uint64(*e.DestinationTranslatedPort), 10) + " ")
 	}
 	if e.DestinationHostName != "" {
-		c += 1
 		b.WriteString("dhost=" + escapeExtensionField(e.DestinationHostName) + " ")
 	}
 	if len(e.DestinationMacAddress) != 0 {
-		c += 1
 		b.WriteString("dmac=" + e.DestinationMacAddress.String() + " ")
 	}
 	if e.DestinationNtDomain != "" {
-		c += 1
 		b.WriteString("dntdom=" + escapeExtensionField(e.DestinationNtDomain) + " ")
 	}
 	if e.DestinationProcessId != nil {
-		c += 1
 		b.WriteString("dpid=" + strconv.FormatUint(uint64(*e.DestinationProcessId), 10) + " ")
 	}
 	if e.DestinationUserPrivileges != "" {
-		c += 1
 		b.WriteString("dpriv=" + escapeExtensionField(e.DestinationUserPrivileges) + " ")
 	}
 	if e.DestinationProcessName != "" {
-		c += 1
 		b.WriteString("dproc=" + escapeExtensionField(e.DestinationProcessName) + " ")
 	}
 	if e.DestinationPort != nil {
-		c += 1
 		b.WriteString("dpt=" + strconv.FormatUint(uint64(*e.DestinationPort), 10) + " ")
 	}
 	if str := e.DestinationAddress.String(); str != "<nil>" {
-		c += 1
 		b.WriteString("dst=" + str + " ")
 	}
 	if e.DestinationUserId != "" {
-		c += 1
 		b.WriteString("duid=" + escapeExtensionField(e.DestinationUserId) + " ")
 	}
 	// TODO add destination marshaling
 
 	// TODO add custom mapped fields
 
-	return c, b.String()
+	return b.String()
 }
 
-func (e Extensions) marshalFileFields() (int, string) {
-	c := 0
+func (e Extensions) marshalFileFields() string {
 	b := strings.Builder{}
 
 	if !e.FileCreateTime.IsZero() {
-		c += 1
 		b.WriteString("fileCreateTime=" + strconv.FormatInt(e.FileCreateTime.UnixMilli(), 10) + " ")
 	}
 	if e.FileHash != "" {
-		c += 1
 		b.WriteString("fileHash=" + escapeExtensionField(e.FileHash) + " ")
 	}
 	if e.FileId != "" {
-		c += 1
 		b.WriteString("fileId=" + escapeExtensionField(e.FileId) + " ")
 	}
 	if !e.FileModificationTime.IsZero() {
-		c += 1
 		b.WriteString("fileModificationTime=" + strconv.FormatInt(e.FileModificationTime.UnixMilli(), 10) + " ")
 	}
 	if e.FilePath != "" {
-		c += 1
 		b.WriteString("filePath=" + escapeExtensionField(e.FilePath) + " ")
 	}
 	if e.FilePermission != "" {
-		c += 1
 		b.WriteString("filePermission=" + escapeExtensionField(e.FilePermission) + " ")
 	}
 	if e.FileType != "" {
-		c += 1
 		b.WriteString("fileType=" + escapeExtensionField(e.FileType) + " ")
 	}
 	if e.FileName != "" {
-		c += 1
 		b.WriteString("fname=" + escapeExtensionField(e.FileName) + " ")
 	}
 	if e.FileSize != nil {
-		c += 1
 		b.WriteString("fsize=" + strconv.FormatUint(uint64(*e.FileSize), 10) + " ")
 	}
+	if !e.OldFileCreateTime.IsZero() {
+		b.WriteString("oldFileCreateTime=" + strconv.FormatInt(e.OldFileCreateTime.UnixMilli(), 10) + " ")
+	}
+	if e.OldFileHash != "" {
+		b.WriteString("oldFileHash=" + escapeExtensionField(e.OldFileHash) + " ")
+	}
+	if e.OldFileId != "" {
+		b.WriteString("oldFileId=" + escapeExtensionField(e.OldFileId) + " ")
+	}
+	if !e.OldFileModificationTime.IsZero() {
+		b.WriteString("oldFileModificationTime=" + strconv.FormatInt(e.OldFileModificationTime.UnixMilli(), 10) + " ")
+	}
+	if e.OldFileName != "" {
+		b.WriteString("oldFileName=" + escapeExtensionField(e.OldFileName) + " ")
+	}
+	if e.OldFilePath != "" {
+		b.WriteString("oldFilePath=" + escapeExtensionField(e.OldFilePath) + " ")
+	}
+	if e.OldFilePermission != "" {
+		b.WriteString("oldFilePermission=" + escapeExtensionField(e.OldFilePermission) + " ")
+	}
+	if e.OldFileType != "" {
+		b.WriteString("oldFileType=" + escapeExtensionField(e.OldFileType) + " ")
+	}
+	if e.OldFileSize != nil {
+		b.WriteString("oldFileSize=" + strconv.FormatUint(uint64(*e.OldFileSize), 10) + " ")
+	}
 
-	//TODO add file fields
+	return b.String()
+}
 
-	return c, b.String()
+func (e Extensions) marshalHttpFields() string {
+	b := strings.Builder{}
+	if (url.URL{}) != e.RequestUrl {
+		b.WriteString("request=" + escapeExtensionField(e.RequestUrl.String()) + " ")
+	}
+	if e.RequestClientApplication != "" {
+		b.WriteString("requestClientApplication=" + escapeExtensionField(e.RequestClientApplication) + " ")
+	}
+	if e.RequestContext != "" {
+		b.WriteString("requestContext=" + escapeExtensionField(e.RequestContext) + " ")
+	}
+	if e.RequestCookies != "" {
+		b.WriteString("requestCookies=" + escapeExtensionField(e.RequestCookies) + " ")
+	}
+	if e.RequestMethod != "" {
+		b.WriteString("requestMethod=" + escapeExtensionField(e.RequestMethod) + " ")
+	}
+
+	return b.String()
+}
+
+func (e Extensions) marshalSourceFields() string {
+	b := strings.Builder{}
+	// TODO implement
+
+	return b.String()
 }
 
 func escapeExtensionField(f string) string {
@@ -401,9 +521,4 @@ func escapeExtensionField(f string) string {
 		}
 	}
 	return b.String()
-}
-
-// Ptr is a convenience function to convert literal values to pointers
-func Ptr[A any](v A) *A {
-	return &v
 }
